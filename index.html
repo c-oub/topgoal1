@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FF8A1F">
+<title>Top Goal 1</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+  html,body{height:100%;margin:0;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+  body{background:#FFF4D6;font-family:"Baloo 2","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;color:#2B2250;user-select:none}
+  .tap{transition:transform .08s}.tap:active{transform:scale(.94)}
+  .pages{scroll-snap-type:x mandatory}.pages>div{scroll-snap-align:center}
+  input[type=range]{accent-color:#FF8A1F;height:36px}
+</style>
+</head>
+<body>
+
+<!-- Dashboard -->
+<main id="home" class="min-h-full flex flex-col" style="padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)">
+  <header class="px-5 pt-6 pb-4 text-center">
+    <h1 class="text-5xl font-extrabold text-[#FF8A1F]">Top Goal 1</h1>
+    <p class="text-xl font-bold mt-1">Pick a unit!</p>
+  </header>
+  <section id="grid" class="grid grid-cols-2 gap-4 px-4 pb-8 flex-1 content-start"></section>
+</main>
+
+<!-- Viewer -->
+<div id="viewer" class="hidden fixed inset-0 flex flex-col bg-[#FFF4D6]" style="padding-top:env(safe-area-inset-top)">
+  <div class="flex items-center gap-3 px-3 py-2" id="vbar">
+    <button id="back" class="tap w-16 h-16 rounded-2xl bg-white text-4xl font-black shadow-[0_4px_0_rgba(0,0,0,.18)]" aria-label="Back to units">&#8592;</button>
+    <h2 id="vtitle" class="text-2xl font-extrabold flex-1"></h2>
+    <span id="vcount" class="text-xl font-bold bg-white rounded-full px-4 py-2"></span>
+  </div>
+
+  <div class="relative flex-1 min-h-0">
+    <div id="pages" class="pages h-full flex overflow-x-auto"></div>
+    <button id="prev" class="tap absolute left-2 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white/90 text-4xl font-black shadow-lg" aria-label="Previous page">&#8249;</button>
+    <button id="next" class="tap absolute right-2 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white/90 text-4xl font-black shadow-lg" aria-label="Next page">&#8250;</button>
+  </div>
+
+  <!-- Audio player -->
+  <div id="player" class="rounded-t-[2rem] px-4 pt-3 text-white" style="padding-bottom:calc(env(safe-area-inset-bottom) + 12px)">
+    <input id="seek" type="range" min="0" max="1000" value="0" class="w-full" aria-label="Seek">
+    <div class="flex justify-between text-lg font-bold px-1"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div class="flex items-center justify-center gap-4 mt-1">
+      <button id="rew" class="tap w-20 h-20 rounded-full bg-white/25 text-2xl font-black" aria-label="Back 10 seconds">&#8634;10</button>
+      <button id="play" class="tap w-28 h-28 rounded-full bg-white text-6xl shadow-[0_6px_0_rgba(0,0,0,.2)]" aria-label="Play">&#9654;</button>
+      <button id="fwd" class="tap w-20 h-20 rounded-full bg-white/25 text-2xl font-black" aria-label="Forward 10 seconds">10&#8635;</button>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+const UNITS = [
+  { n: 1, name: 'Family Events',     icon: '👨‍👩‍👧', color: '#FF6B6B', pages: 12, audio: 'audio/unit1.mp3' },
+  { n: 2, name: 'Chores',            icon: '🧹',     color: '#2EC4B6', pages: 12, audio: 'audio/unit2.mp3' },
+  { n: 3, name: 'Stories',           icon: '📖',     color: '#8E6CEF', pages: 12, audio: 'audio/unit3.mp3' },
+  { n: 4, name: 'After-School Fun',  icon: '⚽',     color: '#3A86FF', pages: 12, audio: 'audio/unit4.mp3' }
+];
+const $ = id => document.getElementById(id);
+const audio = $('audio');
+let unit = null, page = 0;
+
+// Dashboard
+$('grid').innerHTML = UNITS.map((u, i) => `
+  <button data-i="${i}" class="tap rounded-3xl p-4 flex flex-col items-center justify-center text-white aspect-square shadow-[0_8px_0_rgba(0,0,0,.2)]" style="background:${u.color}">
+    <span class="text-6xl leading-none">${u.icon}</span>
+    <span class="text-3xl font-extrabold mt-2">Unit ${u.n}</span>
+    <span class="text-lg font-bold leading-tight text-center">${u.name}</span>
+  </button>`).join('');
+$('grid').addEventListener('click', e => { const b = e.target.closest('button'); if (b) openUnit(+b.dataset.i); });
+
+function openUnit(i) {
+  unit = UNITS[i]; page = 0;
+  $('vtitle').textContent = `Unit ${unit.n}`;
+  $('vbar').style.background = unit.color; $('vtitle').style.color = '#fff';
+  $('player').style.background = unit.color;
+  $('pages').innerHTML = Array.from({ length: unit.pages }, (_, k) =>
+    `<div class="w-full h-full shrink-0 flex items-center justify-center p-2"><img loading="${k < 2 ? 'eager' : 'lazy'}" class="max-w-full max-h-full object-contain rounded-xl bg-white shadow" alt="Unit ${unit.n} page ${k + 1}" src="pages/u${unit.n}_${String(k + 1).padStart(2, '0')}.jpg"></div>`).join('');
+  $('pages').scrollLeft = 0; updatePage();
+  audio.src = unit.audio; setPlayIcon(); $('seek').value = 0; $('cur').textContent = '0:00';
+  $('home').classList.add('hidden'); $('viewer').classList.remove('hidden');
+  history.pushState({ v: 1 }, '');
+}
+function closeUnit() { audio.pause(); $('viewer').classList.add('hidden'); $('home').classList.remove('hidden'); }
+$('back').onclick = () => history.state && history.state.v ? history.back() : closeUnit();
+addEventListener('popstate', closeUnit);
+
+// Pages
+const pg = $('pages');
+function updatePage() { $('vcount').textContent = `${page + 1} / ${unit.pages}`; $('prev').style.opacity = page ? 1 : .3; $('next').style.opacity = page < unit.pages - 1 ? 1 : .3; }
+function goPage(k) { page = Math.max(0, Math.min(unit.pages - 1, k)); pg.scrollTo({ left: page * pg.clientWidth, behavior: 'smooth' }); updatePage(); }
+$('prev').onclick = () => goPage(page - 1); $('next').onclick = () => goPage(page + 1);
+pg.addEventListener('scroll', () => { const k = Math.round(pg.scrollLeft / pg.clientWidth); if (k !== page) { page = k; updatePage(); } });
+
+// Audio
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00';
+function setPlayIcon() { $('play').innerHTML = audio.paused ? '&#9654;' : '&#10074;&#10074;'; $('play').style.color = unit ? unit.color : '#FF8A1F'; }
+$('play').onclick = () => audio.paused ? audio.play() : audio.pause();
+$('rew').onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 10);
+$('fwd').onclick = () => audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+audio.onplay = audio.onpause = audio.onended = setPlayIcon;
+audio.onloadedmetadata = () => $('dur').textContent = fmt(audio.duration);
+audio.ontimeupdate = () => { $('cur').textContent = fmt(audio.currentTime); if (audio.duration) $('seek').value = audio.currentTime / audio.duration * 1000; };
+$('seek').oninput = e => { if (audio.duration) audio.currentTime = e.target.value / 1000 * audio.duration; };
+
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+</script>
+</body>
+</html>
